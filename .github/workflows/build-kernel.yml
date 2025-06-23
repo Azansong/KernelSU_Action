@@ -32,7 +32,7 @@ jobs:
             ENABLE_GCC_ARM64
             ENABLE_GCC_ARM32
             USE_CUSTOM_GCC_64
-            CUSTOM_GCC_64_SOURCE
+            CUSTOM_GCC_极速下载站_SOURCE
             CUSTOM_GCC_64_BRANCH
             CUSTOM_GCC_64_BIN
             USE_CUSTOM_GCC_32
@@ -60,7 +60,7 @@ jobs:
 
         for CONFIG in "${CONFIG_LIST[@]}"; do
             if [[ "$CONFIG" == "EXTRA_CMDS" || "$CONFIG" == "CUSTOM_CMDS" ]]; then
-                echo "$CONFIG=$(grep -w "$CONFIG" "$CONFIG_ENV" | head -n 1 | cut -d ":" -f 2)" >> $GITHUB_ENV
+                echo "$CONFIG=$(grep -w "$CONFIG" "$极速下载站ONFIG_ENV" | head -n 1 | cut -d ":" -f 2)" >> $GITHUB_ENV
             else
                 echo "$CONFIG=$(grep -w "$CONFIG" "$CONFIG_ENV" | head -n 1 | cut -d "=" -f 2)" >> $GITHUB_ENV
             fi
@@ -88,7 +88,7 @@ jobs:
         echo "BUILD_TIME=$(TZ=Asia/Shanghai date "+%Y%m%d%H%M")" >> $GITHUB_ENV
         echo "DEVICE=$(echo ${{ env.KERNEL_CONFIG }} | sed 's!vendor/!!;s/_defconfig//;s/_user//;s/-perf//')" >> $GITHUB_ENV
         sudo apt-get update
-        sudo apt-get install git binutils-aarch64-linux-gnu ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python2 python3
+        sudo apt-get install git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng maven libssl-dev pwgen libswitch-perl policycoreutils minicom libxml-sax-base-perl libxml-simple-perl bc libc6-dev-i386 lib32ncurses5-dev libx11-dev lib32z-dev libgl1-mesa-dev xsltproc unzip device-tree-compiler python2 python3 binutils-aarch64-linux-gnu
         mkdir -p $GITHUB_WORKSPACE/kernel_workspace
 
     - name: Download Clang-aosp
@@ -117,14 +117,12 @@ jobs:
             unzip clang.zip -d clang-aosp/
         fi
 
-    # 关键修改：将GCC下载链接改为Android 11版本
     - name: Download Gcc-aosp
       if: env.USE_CUSTOM_GCC_64 != 'true' || env.USE_CUSTOM_GCC_32 != 'true'
       run: |
         cd $GITHUB_WORKSPACE/kernel_workspace
         if [ ${{ env.ENABLE_GCC_ARM64 }} = true ]; then
             mkdir gcc-64
-            # 修改为Android 11的GCC 64位工具链
             wget -O gcc-aarch64.tar.gz https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/heads/android11-release.tar.gz
             tar -C gcc-64/ -zxvf gcc-aarch64.tar.gz
             echo "GCC_64=CROSS_COMPILE=$GITHUB_WORKSPACE/kernel_workspace/gcc-64/bin/aarch64-linux-android-" >> $GITHUB_ENV
@@ -132,7 +130,6 @@ jobs:
 
         if [ ${{ env.ENABLE_GCC_ARM32 }} = true ]; then
             mkdir gcc-32
-            # 修改为Android 11的GCC 32位工具链
             wget -O gcc-arm.tar.gz https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/heads/android11-release.tar.gz
             tar -C gcc-32/ -zxvf gcc-arm.tar.gz
             echo "GCC_32=CROSS_COMPILE_ARM32=$GITHUB_WORKSPACE/kernel_workspace/gcc-32/bin/arm-linux-androideabi-" >> $GITHUB_ENV
@@ -166,7 +163,7 @@ jobs:
                 mkdir gcc-32
                 tar -C gcc-32/ -zxvf gcc-32.tar.gz
               else
-                git clone ${{ env.CUSTOM_GCC_32_SOURCE }} -b ${{ env.CUSTOM_GCC_32_BRANCH }} gcc-32 --depth=1
+                git clone ${{ env.CUSTOM_GCC_32_SOURCE }} -b ${{ env.CUSTOM_GCC_32_B极速下载站RANCH }} gcc-32 --depth=1
               fi
           else
             wget -O gcc-32.zip ${{ env.CUSTOM_GCC_32_SOURCE }}
@@ -235,11 +232,17 @@ jobs:
             sed -i 's/CONFIG_LTO=y/CONFIG_LTO=n/' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
             sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_CLANG=n/' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
             sed -i 's/CONFIG_THINLTO=y/CONFIG_THINLTO=n/' arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
-            echo "CONFIG_LTO_NONE=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+            echo "CONFIG_LTO_NONE=y" >> arch/${{ env.ARCH }}/config极速下载站s/${{ env.KERNEL_CONFIG }}
         fi
         if [ ${{ env.DISABLE_CC_WERROR }} = true ]; then
             echo "CONFIG_CC_WERROR=n" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
         fi
+        
+        # 关键修改：确保内核配置使用正确的链接器
+        echo "CONFIG_LD_IS_LLD=n" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+        echo "CONFIG_LD_VERSION=00000" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+        echo "CONFIG_LTO_NONE=y" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
+        echo "CONFIG_LD=aarch64-linux-gnu-ld" >> arch/${{ env.ARCH }}/configs/${{ env.KERNEL_CONFIG }}
 
     - name: Setup ccache
       if: env.ENABLE_CCACHE == 'true'
@@ -258,19 +261,19 @@ jobs:
           export KSU_EXPECTED_SIZE=${{ env.KSU_EXPECTED_SIZE }}
           export KSU_EXPECTED_HASH=${{ env.KSU_EXPECTED_HASH }}
         fi
-        make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} ${{ env.KERNEL_CONFIG }}
-        if [ ${{ env.ENABLE_CCACHE }} = true ]; then
-            make -j$(nproc --all) CC="ccache clang" O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }}
-        else
-            make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }}
-        fi
-        make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} ${{ env.KERNEL_CONFIG }} LD=aarch64-linux-gnu-ld
-        if [ ${{ env.ENABLE_CCACHE }} = true ]; then
-            make -j$(nproc --all) CC="ccache clang" O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} LD=aarch64-linux-gnu-ld
-        else
-            make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} LD=aarch64-linux-gnu-ld
-        fi
         
+        # 第一遍：生成配置
+        make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} ${{ env.KERNEL_CONFIG }}
+        
+        # 第二遍：编译内核
+        if [ ${{ env.ENABLE_CCACHE }} = true ]; then
+            make -j$(nproc --all) CC="ccache clang" O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} \
+                LD=aarch64-linux-gnu-ld HOSTLD=aarch64-linux-gnu-ld
+        else
+            make -j$(nproc --all) CC=clang O=out ARCH=${{ env.ARCH }} ${{ env.CUSTOM_CMDS }} ${{ env.EXTRA_CMDS }} ${{ env.GCC_64 }} ${{ env.GCC_32 }} \
+                LD=aarch64-linux-gnu-ld HOSTLD=aarch64-linux-gnu-ld
+        fi
+
     - name: Check a kernel output files
       run: |
        cd $GITHUB_WORKSPACE/kernel_workspace
